@@ -58,6 +58,7 @@ import {
 } from '../components/ui/dialog';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Textarea } from '../components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -651,10 +652,40 @@ function ManualSupplierModal({
 // Вкладка «Переписка»
 // ============================================================
 function TenderCommunicationsTab({ tenderId }: { tenderId: string }) {
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [composerForm, setComposerForm] = useState({
+    supplier_id: '',
+    channel: 'email',
+    subject: '',
+    body: '',
+  });
+
   const communicationsQuery = useQuery({
     queryKey: ['tender', tenderId, 'communications'],
     queryFn: () => tendersApi.getCommunications(tenderId),
   });
+
+  const handleSend = async () => {
+    if (!composerForm.supplier_id || !composerForm.subject.trim() || !composerForm.body.trim()) {
+      toast.error('Заполните все поля');
+      return;
+    }
+    try {
+      await tendersApi.sendCommunication(tenderId, {
+        supplier_id: composerForm.supplier_id,
+        channel: composerForm.channel,
+        subject: composerForm.subject,
+        body: composerForm.body,
+        message_type: 'manual',
+      });
+      toast.success('Сообщение отправлено');
+      setComposerOpen(false);
+      setComposerForm({ supplier_id: '', channel: 'email', subject: '', body: '' });
+      communicationsQuery.refetch();
+    } catch {
+      toast.error('Не удалось отправить сообщение');
+    }
+  };
 
   if (communicationsQuery.isLoading) return <LoadingSkeleton rows={5} cols={1} type="card" />;
   if (communicationsQuery.isError) return <ErrorAlert message="Не удалось загрузить переписку" onRetry={() => communicationsQuery.refetch()} />;
@@ -671,6 +702,16 @@ function TenderCommunicationsTab({ tenderId }: { tenderId: string }) {
               <span className="text-sm font-semibold text-slate-900">{thread.supplier_name}</span>
               <span className="text-xs text-slate-500">({thread.status})</span>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setComposerForm((prev) => ({ ...prev, supplier_id: thread.supplier_id }));
+                setComposerOpen(true);
+              }}
+            >
+              <Send className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />Написать
+            </Button>
           </div>
           <div className="divide-y divide-slate-100">
             {thread.messages?.map((message: any) => (
@@ -689,6 +730,54 @@ function TenderCommunicationsTab({ tenderId }: { tenderId: string }) {
           </div>
         </div>
       ))}
+
+      <Dialog open={composerOpen} onOpenChange={setComposerOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Новое сообщение</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Поставщик</Label>
+              <Select value={composerForm.supplier_id} onValueChange={(value) => setComposerForm({ ...composerForm, supplier_id: value })}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Выберите поставщика" /></SelectTrigger>
+                <SelectContent>
+                  {threads.map((t: any) => <SelectItem key={t.supplier_id} value={t.supplier_id}>{t.supplier_name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Канал</Label>
+              <Select value={composerForm.channel} onValueChange={(value) => setComposerForm({ ...composerForm, channel: value })}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="email">Email</SelectItem>
+                  <SelectItem value="telegram">Telegram</SelectItem>
+                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Тема</Label>
+              <Input value={composerForm.subject} onChange={(e) => setComposerForm({ ...composerForm, subject: e.target.value })} placeholder="Тема сообщения" className="mt-1" />
+            </div>
+            <div>
+              <Label>Текст</Label>
+              <Textarea
+                value={composerForm.body}
+                onChange={(e) => setComposerForm({ ...composerForm, body: e.target.value })}
+                rows={4}
+                placeholder="Текст сообщения..."
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setComposerOpen(false)}>Отмена</Button>
+            <Button onClick={handleSend}><Send className="h-4 w-4 mr-2" aria-hidden="true" />Отправить</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1033,7 +1122,20 @@ function ActionButtons({
   onNavigateToTab: (tab: string) => void;
   onNavigateDecisions: () => void;
 }) {
+  const [showRequestCP, setShowRequestCP] = useState(false);
+  const [attachTable, setAttachTable] = useState(true);
   const status = tender.status;
+
+  const handleRequestCP = async () => {
+    try {
+      await tendersApi.requestCP(tender.id, { attach_positions_table: attachTable });
+      toast.success('Запрос КП отправлен');
+      setShowRequestCP(false);
+    } catch {
+      toast.error('Не удалось запросить КП');
+    }
+  };
+
   if (status === 'NEW') {
     return <Button onClick={() => onReprocess('DOCUMENTS_LOADING')}><Play className="h-4 w-4 mr-2" aria-hidden="true" />Запустить обработку</Button>;
   }
@@ -1065,7 +1167,28 @@ function ActionButtons({
     return <Button onClick={() => onNavigateToTab('suppliers')}><Users className="h-4 w-4 mr-2" aria-hidden="true" />Подтвердить поставщиков</Button>;
   }
   if (status === 'AWAITING_CP') {
-    return <Button onClick={() => onNavigateToTab('suppliers')}><Send className="h-4 w-4 mr-2" aria-hidden="true" />Запросить КП</Button>;
+    return (
+      <>
+        <Button onClick={() => setShowRequestCP(true)}><Send className="h-4 w-4 mr-2" aria-hidden="true" />Запросить КП</Button>
+        <Dialog open={showRequestCP} onOpenChange={setShowRequestCP}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Запрос коммерческих предложений</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox checked={attachTable} onCheckedChange={(checked) => setAttachTable(!!checked)} />
+                Прикрепить таблицу позиций (Excel)
+              </label>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowRequestCP(false)}>Отмена</Button>
+              <Button onClick={handleRequestCP}>Отправить запросы</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </>
+    );
   }
   if (status === 'CP_FULLY_RECEIVED') {
     return <Button onClick={() => onNavigateToTab('negotiation')}><MessagesSquare className="h-4 w-4 mr-2" aria-hidden="true" />Начать переговоры</Button>;

@@ -1,6 +1,18 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+const getApiBaseUrl = (): string | undefined => {
+  // Для Vite (браузер)
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+  // Для Jest (Node)
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env.VITE_API_BASE_URL;
+  }
+  return undefined;
+};
+
+const API_BASE_URL = getApiBaseUrl() || 'http://localhost:8000/api/v1';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

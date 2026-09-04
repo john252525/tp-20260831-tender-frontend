@@ -97,11 +97,7 @@ const STATUS_OPTIONS = [
 // Модалки
 // ============================================================
 function ReprocessModal({ open, onOpenChange, selectedCount, onConfirm, isLoading }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  selectedCount: number;
-  onConfirm: (fromStage: string) => void;
-  isLoading: boolean;
+  open: boolean; onOpenChange: (open: boolean) => void; selectedCount: number; onConfirm: (fromStage: string) => void; isLoading: boolean;
 }) {
   const [fromStage, setFromStage] = useState('DOCUMENTS_LOADING');
   return (
@@ -113,11 +109,7 @@ function ReprocessModal({ open, onOpenChange, selectedCount, onConfirm, isLoadin
         </DialogHeader>
         <div className="space-y-2">
           <Label>Этап перезапуска</Label>
-          <select
-            value={fromStage}
-            onChange={(e) => setFromStage(e.target.value)}
-            className="w-full h-9 border border-slate-200 rounded-md px-3 text-sm"
-          >
+          <select value={fromStage} onChange={(e) => setFromStage(e.target.value)} className="w-full h-9 border border-slate-200 rounded-md px-3 text-sm">
             <option value="DOCUMENTS_LOADING">Загрузка документов</option>
             <option value="SEMANTIC_FILTERING">Семантическая фильтрация</option>
             <option value="SCORING">Скоринг</option>
@@ -136,11 +128,7 @@ function ReprocessModal({ open, onOpenChange, selectedCount, onConfirm, isLoadin
 }
 
 function SearchSuppliersModal({ open, onOpenChange, selectedCount, onConfirm, isLoading }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  selectedCount: number;
-  onConfirm: (data: any) => void;
-  isLoading: boolean;
+  open: boolean; onOpenChange: (open: boolean) => void; selectedCount: number; onConfirm: (data: any) => void; isLoading: boolean;
 }) {
   const [maxSuppliers, setMaxSuppliers] = useState(10);
   const [channels, setChannels] = useState(['google', 'internal_db']);
@@ -148,34 +136,20 @@ function SearchSuppliersModal({ open, onOpenChange, selectedCount, onConfirm, is
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Поиск поставщиков</DialogTitle>
-          <DialogDescription>Выбрано: {selectedCount} тендер(ов)</DialogDescription>
-        </DialogHeader>
+        <DialogHeader><DialogTitle>Поиск поставщиков</DialogTitle><DialogDescription>Выбрано: {selectedCount} тендер(ов)</DialogDescription></DialogHeader>
         <div className="space-y-4">
-          <div>
-            <Label>Максимум поставщиков на лот</Label>
-            <Input type="number" value={maxSuppliers} onChange={(e) => setMaxSuppliers(Number(e.target.value))} min={1} max={50} className="mt-1" />
-          </div>
+          <div><Label>Максимум поставщиков на лот</Label><Input type="number" value={maxSuppliers} onChange={(e) => setMaxSuppliers(Number(e.target.value))} min={1} max={50} className="mt-1" /></div>
           <div>
             <Label>Каналы поиска</Label>
             <div className="flex gap-4 mt-2">
-              <label className="flex items-center gap-2 text-sm">
-                <Checkbox checked={channels.includes('google')} onCheckedChange={(checked) => setChannels(checked ? [...channels, 'google'] : channels.filter((c) => c !== 'google'))} />
-                Google Search
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <Checkbox checked={channels.includes('internal_db')} onCheckedChange={(checked) => setChannels(checked ? [...channels, 'internal_db'] : channels.filter((c) => c !== 'internal_db'))} />
-                Внутренняя база
-              </label>
+              <label className="flex items-center gap-2 text-sm"><Checkbox checked={channels.includes('google')} onCheckedChange={(checked) => setChannels(checked ? [...channels, 'google'] : channels.filter((c) => c !== 'google'))} />Google Search</label>
+              <label className="flex items-center gap-2 text-sm"><Checkbox checked={channels.includes('internal_db')} onCheckedChange={(checked) => setChannels(checked ? [...channels, 'internal_db'] : channels.filter((c) => c !== 'internal_db'))} />Внутренняя база</label>
             </div>
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>Отмена</Button>
-          <Button onClick={() => onConfirm({ max_suppliers: maxSuppliers, channels, priority_order: priority })} disabled={isLoading}>
-            {isLoading ? 'Запуск...' : 'Начать поиск'}
-          </Button>
+          <Button onClick={() => onConfirm({ max_suppliers: maxSuppliers, channels, priority_order: priority })} disabled={isLoading}>{isLoading ? 'Запуск...' : 'Начать поиск'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -183,31 +157,19 @@ function SearchSuppliersModal({ open, onOpenChange, selectedCount, onConfirm, is
 }
 
 function RequestCPModal({ open, onOpenChange, selectedCount, onConfirm, isLoading }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  selectedCount: number;
-  onConfirm: (data: any) => void;
-  isLoading: boolean;
+  open: boolean; onOpenChange: (open: boolean) => void; selectedCount: number; onConfirm: (data: any) => void; isLoading: boolean;
 }) {
   const [attachTable, setAttachTable] = useState(true);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Запрос коммерческих предложений</DialogTitle>
-          <DialogDescription>Выбрано: {selectedCount} тендер(ов)</DialogDescription>
-        </DialogHeader>
+        <DialogHeader><DialogTitle>Запрос коммерческих предложений</DialogTitle><DialogDescription>Выбрано: {selectedCount} тендер(ов)</DialogDescription></DialogHeader>
         <div className="space-y-4">
-          <label className="flex items-center gap-2 text-sm">
-            <Checkbox checked={attachTable} onCheckedChange={(checked) => setAttachTable(!!checked)} />
-            Прикрепить таблицу позиций (Excel)
-          </label>
+          <label className="flex items-center gap-2 text-sm"><Checkbox checked={attachTable} onCheckedChange={(checked) => setAttachTable(!!checked)} />Прикрепить таблицу позиций (Excel)</label>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>Отмена</Button>
-          <Button onClick={() => onConfirm({ attach_positions_table: attachTable })} disabled={isLoading}>
-            {isLoading ? 'Отправка...' : 'Отправить запросы'}
-          </Button>
+          <Button onClick={() => onConfirm({ attach_positions_table: attachTable })} disabled={isLoading}>{isLoading ? 'Отправка...' : 'Отправить запросы'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -215,21 +177,14 @@ function RequestCPModal({ open, onOpenChange, selectedCount, onConfirm, isLoadin
 }
 
 function NegotiateModal({ open, onOpenChange, selectedCount, onConfirm, isLoading }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  selectedCount: number;
-  onConfirm: (data: any) => void;
-  isLoading: boolean;
+  open: boolean; onOpenChange: (open: boolean) => void; selectedCount: number; onConfirm: (data: any) => void; isLoading: boolean;
 }) {
   const [action, setAction] = useState('request_clarification');
   const [instructions, setInstructions] = useState('');
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Переговоры</DialogTitle>
-          <DialogDescription>Выбрано: {selectedCount} тендер(ов)</DialogDescription>
-        </DialogHeader>
+        <DialogHeader><DialogTitle>Переговоры</DialogTitle><DialogDescription>Выбрано: {selectedCount} тендер(ов)</DialogDescription></DialogHeader>
         <div className="space-y-4">
           <div>
             <Label>Действие</Label>
@@ -239,16 +194,11 @@ function NegotiateModal({ open, onOpenChange, selectedCount, onConfirm, isLoadin
               <label className="flex items-center gap-2 text-sm"><input type="radio" checked={action === 'request_both'} onChange={() => setAction('request_both')} />Оба действия</label>
             </div>
           </div>
-          <div>
-            <Label>Дополнительная инструкция (опционально)</Label>
-            <textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} className="w-full h-20 border border-slate-200 rounded-md px-3 py-2 text-sm mt-1" placeholder="Например: уточните сроки доставки" />
-          </div>
+          <div><Label>Дополнительная инструкция (опционально)</Label><textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} className="w-full h-20 border border-slate-200 rounded-md px-3 py-2 text-sm mt-1" placeholder="Например: уточните сроки доставки" /></div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>Отмена</Button>
-          <Button onClick={() => onConfirm({ action, custom_instructions: instructions || undefined })} disabled={isLoading}>
-            {isLoading ? 'Запуск...' : 'Начать'}
-          </Button>
+          <Button onClick={() => onConfirm({ action, custom_instructions: instructions || undefined })} disabled={isLoading}>{isLoading ? 'Запуск...' : 'Начать'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -261,12 +211,12 @@ function NegotiateModal({ open, onOpenChange, selectedCount, onConfirm, isLoadin
 export function TendersPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [searchInput, setSearchInput] = useState('');
+  const [searchInput, setSearchInput] = useState(() => searchParams.get('search') || '');
   const debouncedSearch = useDebounce(searchInput, 300);
 
   const filters: TenderFilters = useMemo(() => {
     return {
-      search: debouncedSearch || searchParams.get('search') || '',
+      search: debouncedSearch,
       status: searchParams.get('status') ? searchParams.get('status')!.split(',') : [],
       category_id: searchParams.get('category_id'),
       source_id: searchParams.get('source_id'),
@@ -287,18 +237,18 @@ export function TendersPage() {
   }, [searchParams, debouncedSearch]);
 
   useEffect(() => {
-    if (debouncedSearch !== '') {
-      const newParams = new URLSearchParams(searchParams);
+    const newParams = new URLSearchParams(searchParams);
+    const currentSearch = searchParams.get('search') || '';
+    if (debouncedSearch) {
       newParams.set('search', debouncedSearch);
-      newParams.set('page', '1');
-      setSearchParams(newParams, { replace: true });
     } else {
-      const newParams = new URLSearchParams(searchParams);
       newParams.delete('search');
-      newParams.set('page', '1');
+    }
+    newParams.set('page', '1');
+    if (currentSearch !== debouncedSearch || searchParams.get('page') !== '1') {
       setSearchParams(newParams, { replace: true });
     }
-  }, [debouncedSearch]);
+  }, [debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -546,36 +496,27 @@ export function TendersPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Тендеры"
-        description={`Всего: ${meta?.total || 0}`}
-        actions={
-          <>
-            <button onClick={handleExportCSV} className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
-              <Download className="h-4 w-4" aria-hidden="true" />Экспорт CSV
-            </button>
-            <button onClick={() => tendersQuery.refetch()} className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
-              <RefreshCw className="h-4 w-4" aria-hidden="true" />Обновить
-            </button>
-            <button onClick={() => setShowFilters(!showFilters)} className={cn('inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors', showFilters ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50')}>
-              <Search className="h-4 w-4" aria-hidden="true" />Фильтры
-              {filters.status.length > 0 && <span className="bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5">{filters.status.length}</span>}
-            </button>
-          </>
-        }
-      />
+      <PageHeader title="Тендеры" description={`Всего: ${meta?.total || 0}`} actions={
+        <>
+          <button onClick={handleExportCSV} className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+            <Download className="h-4 w-4" aria-hidden="true" />Экспорт CSV
+          </button>
+          <button onClick={() => tendersQuery.refetch()} className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />Обновить
+          </button>
+          <button onClick={() => setShowFilters(!showFilters)} className={cn('inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors', showFilters ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50')}>
+            <Search className="h-4 w-4" aria-hidden="true" />Фильтры
+            {filters.status.length > 0 && <span className="bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5">{filters.status.length}</span>}
+          </button>
+        </>
+      } />
 
       {showFilters && (
         <div className="rounded-lg border border-slate-200 p-4 mb-6 bg-white">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <div>
               <Label className="text-xs text-slate-500">Поиск</Label>
-              <Input
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Название, описание, заказчик"
-                className="mt-1"
-              />
+              <Input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Название, описание, заказчик" className="mt-1" />
             </div>
             <div>
               <Label className="text-xs text-slate-500">Статус</Label>
@@ -690,9 +631,7 @@ export function TendersPage() {
           onRowClick={(row) => navigate(`/tenders/${row.id}`)}
           enableVirtualization
           tableHeight={600}
-          emptyState={
-            <EmptyState icon={FileText} title="Тендеры не найдены" description="Попробуйте изменить фильтры или сбросить их" actionLabel="Сбросить фильтры" onAction={resetFilters} />
-          }
+          emptyState={<EmptyState icon={FileText} title="Тендеры не найдены" description="Попробуйте изменить фильтры или сбросить их" actionLabel="Сбросить фильтры" onAction={resetFilters} />}
         />
       )}
 
