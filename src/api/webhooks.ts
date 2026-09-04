@@ -9,6 +9,7 @@ export interface Webhook {
   last_status: 'success' | 'error' | null;
   retry_count: number;
   created_at: string;
+  secret?: string;
 }
 
 export const webhooksApi = {

@@ -1,9 +1,9 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useDebounce } from '../hooks/useDebounce';
 import {
   Search,
-  Plus,
   MoreHorizontal,
   RefreshCw,
   FileText,
@@ -24,11 +24,9 @@ import { tenderSourcesApi } from '../api/tenderSources';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { ScoreBadge } from '../components/common/ScoreBadge';
 import { DataTable } from '../components/common/DataTable';
-import { Pagination } from '../components/common/Pagination';
 import { EmptyState } from '../components/common/EmptyState';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { ErrorAlert } from '../components/common/ErrorAlert';
-import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { PageHeader } from '../components/common/PageHeader';
 import { formatMoney, formatDate } from '../lib/formatters';
 import { cn } from '../lib/utils';
@@ -76,26 +74,6 @@ interface TenderFilters {
   per_page: number;
 }
 
-const DEFAULT_FILTERS: TenderFilters = {
-  search: '',
-  status: [],
-  category_id: null,
-  source_id: null,
-  nmck_min: '',
-  nmck_max: '',
-  published_after: '',
-  published_before: '',
-  deadline_after: '',
-  deadline_before: '',
-  has_score: false,
-  score_min: '',
-  score_max: '',
-  sort_by: 'created_at',
-  sort_order: 'desc',
-  page: 1,
-  per_page: 20,
-};
-
 const SORT_OPTIONS = [
   { value: 'created_at', label: 'По дате создания' },
   { value: 'published_at', label: 'По дате публикации' },
@@ -116,15 +94,9 @@ const STATUS_OPTIONS = [
 ];
 
 // ============================================================
-// Модалка «Обработать»
+// Модалки
 // ============================================================
-function ReprocessModal({
-  open,
-  onOpenChange,
-  selectedCount,
-  onConfirm,
-  isLoading,
-}: {
+function ReprocessModal({ open, onOpenChange, selectedCount, onConfirm, isLoading }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedCount: number;
@@ -137,9 +109,7 @@ function ReprocessModal({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Обработать тендеры</DialogTitle>
-          <DialogDescription>
-            Выбрано: {selectedCount} тендер(ов). Выберите этап для перезапуска.
-          </DialogDescription>
+          <DialogDescription>Выбрано: {selectedCount} тендер(ов). Выберите этап для перезапуска.</DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
           <Label>Этап перезапуска</Label>
@@ -155,9 +125,7 @@ function ReprocessModal({
           </select>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
-            Отмена
-          </Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>Отмена</Button>
           <Button onClick={() => onConfirm(fromStage)} disabled={isLoading}>
             {isLoading ? 'Запуск...' : `Запустить (${selectedCount})`}
           </Button>
@@ -167,16 +135,7 @@ function ReprocessModal({
   );
 }
 
-// ============================================================
-// Модалка «Найти поставщиков»
-// ============================================================
-function SearchSuppliersModal({
-  open,
-  onOpenChange,
-  selectedCount,
-  onConfirm,
-  isLoading,
-}: {
+function SearchSuppliersModal({ open, onOpenChange, selectedCount, onConfirm, isLoading }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedCount: number;
@@ -196,43 +155,24 @@ function SearchSuppliersModal({
         <div className="space-y-4">
           <div>
             <Label>Максимум поставщиков на лот</Label>
-            <Input
-              type="number"
-              value={maxSuppliers}
-              onChange={(e) => setMaxSuppliers(Number(e.target.value))}
-              min={1}
-              max={50}
-              className="mt-1"
-            />
+            <Input type="number" value={maxSuppliers} onChange={(e) => setMaxSuppliers(Number(e.target.value))} min={1} max={50} className="mt-1" />
           </div>
           <div>
             <Label>Каналы поиска</Label>
             <div className="flex gap-4 mt-2">
               <label className="flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={channels.includes('google')}
-                  onCheckedChange={(checked) =>
-                    setChannels(checked ? [...channels, 'google'] : channels.filter((c) => c !== 'google'))
-                  }
-                />
+                <Checkbox checked={channels.includes('google')} onCheckedChange={(checked) => setChannels(checked ? [...channels, 'google'] : channels.filter((c) => c !== 'google'))} />
                 Google Search
               </label>
               <label className="flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={channels.includes('internal_db')}
-                  onCheckedChange={(checked) =>
-                    setChannels(checked ? [...channels, 'internal_db'] : channels.filter((c) => c !== 'internal_db'))
-                  }
-                />
+                <Checkbox checked={channels.includes('internal_db')} onCheckedChange={(checked) => setChannels(checked ? [...channels, 'internal_db'] : channels.filter((c) => c !== 'internal_db'))} />
                 Внутренняя база
               </label>
             </div>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
-            Отмена
-          </Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>Отмена</Button>
           <Button onClick={() => onConfirm({ max_suppliers: maxSuppliers, channels, priority_order: priority })} disabled={isLoading}>
             {isLoading ? 'Запуск...' : 'Начать поиск'}
           </Button>
@@ -242,16 +182,7 @@ function SearchSuppliersModal({
   );
 }
 
-// ============================================================
-// Модалка «Запросить КП»
-// ============================================================
-function RequestCPModal({
-  open,
-  onOpenChange,
-  selectedCount,
-  onConfirm,
-  isLoading,
-}: {
+function RequestCPModal({ open, onOpenChange, selectedCount, onConfirm, isLoading }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedCount: number;
@@ -273,9 +204,7 @@ function RequestCPModal({
           </label>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
-            Отмена
-          </Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>Отмена</Button>
           <Button onClick={() => onConfirm({ attach_positions_table: attachTable })} disabled={isLoading}>
             {isLoading ? 'Отправка...' : 'Отправить запросы'}
           </Button>
@@ -285,16 +214,7 @@ function RequestCPModal({
   );
 }
 
-// ============================================================
-// Модалка «Переговоры»
-// ============================================================
-function NegotiateModal({
-  open,
-  onOpenChange,
-  selectedCount,
-  onConfirm,
-  isLoading,
-}: {
+function NegotiateModal({ open, onOpenChange, selectedCount, onConfirm, isLoading }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedCount: number;
@@ -314,34 +234,18 @@ function NegotiateModal({
           <div>
             <Label>Действие</Label>
             <div className="space-y-2 mt-2">
-              <label className="flex items-center gap-2 text-sm">
-                <input type="radio" checked={action === 'request_clarification'} onChange={() => setAction('request_clarification')} />
-                Уточнение недостающей информации
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="radio" checked={action === 'request_discount'} onChange={() => setAction('request_discount')} />
-                Запрос скидки
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="radio" checked={action === 'request_both'} onChange={() => setAction('request_both')} />
-                Оба действия
-              </label>
+              <label className="flex items-center gap-2 text-sm"><input type="radio" checked={action === 'request_clarification'} onChange={() => setAction('request_clarification')} />Уточнение недостающей информации</label>
+              <label className="flex items-center gap-2 text-sm"><input type="radio" checked={action === 'request_discount'} onChange={() => setAction('request_discount')} />Запрос скидки</label>
+              <label className="flex items-center gap-2 text-sm"><input type="radio" checked={action === 'request_both'} onChange={() => setAction('request_both')} />Оба действия</label>
             </div>
           </div>
           <div>
             <Label>Дополнительная инструкция (опционально)</Label>
-            <textarea
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-              className="w-full h-20 border border-slate-200 rounded-md px-3 py-2 text-sm mt-1"
-              placeholder="Например: уточните сроки доставки"
-            />
+            <textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} className="w-full h-20 border border-slate-200 rounded-md px-3 py-2 text-sm mt-1" placeholder="Например: уточните сроки доставки" />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
-            Отмена
-          </Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>Отмена</Button>
           <Button onClick={() => onConfirm({ action, custom_instructions: instructions || undefined })} disabled={isLoading}>
             {isLoading ? 'Запуск...' : 'Начать'}
           </Button>
@@ -357,10 +261,12 @@ function NegotiateModal({
 export function TendersPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [searchInput, setSearchInput] = useState('');
+  const debouncedSearch = useDebounce(searchInput, 300);
 
   const filters: TenderFilters = useMemo(() => {
     return {
-      search: searchParams.get('search') || '',
+      search: debouncedSearch || searchParams.get('search') || '',
       status: searchParams.get('status') ? searchParams.get('status')!.split(',') : [],
       category_id: searchParams.get('category_id'),
       source_id: searchParams.get('source_id'),
@@ -378,53 +284,53 @@ export function TendersPage() {
       page: Number(searchParams.get('page') || 1),
       per_page: Number(searchParams.get('per_page') || 20),
     };
-  }, [searchParams]);
+  }, [searchParams, debouncedSearch]);
+
+  useEffect(() => {
+    if (debouncedSearch !== '') {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('search', debouncedSearch);
+      newParams.set('page', '1');
+      setSearchParams(newParams, { replace: true });
+    } else {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('search');
+      newParams.set('page', '1');
+      setSearchParams(newParams, { replace: true });
+    }
+  }, [debouncedSearch]);
 
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [sorting, setSorting] = useState<SortingState>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [modalState, setModalState] = useState<'none' | 'reprocess' | 'search' | 'cp' | 'negotiate'>('none');
   const [isBulkLoading, setIsBulkLoading] = useState(false);
-  const [confirmDialog, setConfirmDialog] = useState<{
-    open: boolean;
-    title: string;
-    description: string;
-    onConfirm: () => void;
-  }>({ open: false, title: '', description: '', onConfirm: () => {} });
 
   const tendersQuery = useQuery({
     queryKey: ['tenders', 'list', filters],
-    queryFn: () =>
-      tendersApi.list({
-        search: filters.search || undefined,
-        status: filters.status.length > 0 ? filters.status.join(',') : undefined,
-        category_id: filters.category_id || undefined,
-        source_id: filters.source_id || undefined,
-        nmck_min: filters.nmck_min ? Number(filters.nmck_min) : undefined,
-        nmck_max: filters.nmck_max ? Number(filters.nmck_max) : undefined,
-        published_after: filters.published_after || undefined,
-        published_before: filters.published_before || undefined,
-        deadline_after: filters.deadline_after || undefined,
-        deadline_before: filters.deadline_before || undefined,
-        has_score: filters.has_score || undefined,
-        score_min: filters.score_min ? Number(filters.score_min) : undefined,
-        score_max: filters.score_max ? Number(filters.score_max) : undefined,
-        sort_by: filters.sort_by,
-        sort_order: filters.sort_order,
-        page: filters.page,
-        per_page: filters.per_page,
-      }),
+    queryFn: () => tendersApi.list({
+      search: filters.search || undefined,
+      status: filters.status.length > 0 ? filters.status.join(',') : undefined,
+      category_id: filters.category_id || undefined,
+      source_id: filters.source_id || undefined,
+      nmck_min: filters.nmck_min ? Number(filters.nmck_min) : undefined,
+      nmck_max: filters.nmck_max ? Number(filters.nmck_max) : undefined,
+      published_after: filters.published_after || undefined,
+      published_before: filters.published_before || undefined,
+      deadline_after: filters.deadline_after || undefined,
+      deadline_before: filters.deadline_before || undefined,
+      has_score: filters.has_score || undefined,
+      score_min: filters.score_min ? Number(filters.score_min) : undefined,
+      score_max: filters.score_max ? Number(filters.score_max) : undefined,
+      sort_by: filters.sort_by,
+      sort_order: filters.sort_order,
+      page: filters.page,
+      per_page: filters.per_page,
+    }),
   });
 
-  const categoriesQuery = useQuery({
-    queryKey: ['categories', 'all'],
-    queryFn: () => categoriesApi.list({ per_page: 100 }),
-  });
-
-  const sourcesQuery = useQuery({
-    queryKey: ['tender-sources', 'all'],
-    queryFn: () => tenderSourcesApi.list(),
-  });
+  const categoriesQuery = useQuery({ queryKey: ['categories', 'all'], queryFn: () => categoriesApi.list({ per_page: 100 }) });
+  const sourcesQuery = useQuery({ queryKey: ['tender-sources', 'all'], queryFn: () => tenderSourcesApi.list() });
 
   const tenders = tendersQuery.data?.data || [];
   const meta = tendersQuery.data?.meta;
@@ -454,6 +360,7 @@ export function TendersPage() {
   const resetFilters = () => {
     setSearchParams({}, { replace: true });
     setRowSelection({});
+    setSearchInput('');
   };
 
   const handleBulkAction = async (action: string, data?: any) => {
@@ -462,23 +369,18 @@ export function TendersPage() {
       const ids = selectedIds;
       const promises = ids.map((id) => {
         switch (action) {
-          case 'reprocess':
-            return tendersApi.reprocess(id, { from_stage: data.from_stage });
-          case 'search':
-            return tendersApi.searchSuppliers(id, data);
-          case 'cp':
-            return tendersApi.requestCP(id, data);
-          case 'negotiate':
-            return tendersApi.negotiate(id, data);
-          default:
-            return Promise.resolve();
+          case 'reprocess': return tendersApi.reprocess(id, { from_stage: data.from_stage });
+          case 'search': return tendersApi.searchSuppliers(id, data);
+          case 'cp': return tendersApi.requestCP(id, data);
+          case 'negotiate': return tendersApi.negotiate(id, data);
+          default: return Promise.resolve();
         }
       });
       await Promise.all(promises);
       toast.success(`Операция запущена для ${ids.length} тендер(ов)`);
       setModalState('none');
       setRowSelection({});
-    } catch (error) {
+    } catch {
       toast.error('Не удалось выполнить операцию');
     } finally {
       setIsBulkLoading(false);
@@ -487,17 +389,7 @@ export function TendersPage() {
 
   const handleExportCSV = () => {
     const headers = ['ID', 'Название', 'Статус', 'НМЦК', 'Категория', 'Скор', 'Дедлайн', 'Опубликован', 'Заказчик'];
-    const rows = tenders.map((t) => [
-      t.id,
-      t.title,
-      t.status,
-      t.nmck,
-      t.matched_category_name,
-      t.score,
-      t.deadline_at,
-      t.published_at,
-      t.customer_name,
-    ]);
+    const rows = tenders.map((t) => [t.id, t.title, t.status, t.nmck, t.matched_category_name, t.score, t.deadline_at, t.published_at, t.customer_name]);
     const csv = [headers.join(','), ...rows.map((r) => r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -513,19 +405,10 @@ export function TendersPage() {
       {
         id: 'select',
         header: ({ table }) => (
-          <Checkbox
-            checked={table.getIsAllPageRowsSelected()}
-            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-            aria-label="Выбрать все"
-          />
+          <Checkbox checked={table.getIsAllPageRowsSelected()} onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)} aria-label="Выбрать все" />
         ),
         cell: ({ row }) => (
-          <Checkbox
-            checked={row.getIsSelected()}
-            onCheckedChange={(value) => row.toggleSelected(!!value)}
-            aria-label="Выбрать строку"
-            onClick={(e) => e.stopPropagation()}
-          />
+          <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Выбрать строку" onClick={(e) => e.stopPropagation()} />
         ),
         size: 40,
         enableSorting: false,
@@ -535,13 +418,11 @@ export function TendersPage() {
         header: 'Название',
         accessorKey: 'title',
         cell: ({ row }) => (
-          <button
-            onClick={() => navigate(`/tenders/${row.original.id}`)}
-            className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline text-left truncate max-w-[300px]"
-          >
+          <button onClick={() => navigate(`/tenders/${row.original.id}`)} className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline text-left truncate max-w-[300px]">
             {row.original.title}
           </button>
         ),
+        size: 300,
       },
       {
         id: 'status',
@@ -569,9 +450,7 @@ export function TendersPage() {
         id: 'similarity',
         header: 'Сход.',
         accessorKey: 'similarity_score',
-        cell: ({ row }) => (
-          <span className="text-xs text-slate-500">{row.original.similarity_score ? `${(row.original.similarity_score * 100).toFixed(0)}%` : '—'}</span>
-        ),
+        cell: ({ row }) => <span className="text-xs text-slate-500">{row.original.similarity_score ? `${(row.original.similarity_score * 100).toFixed(0)}%` : '—'}</span>,
         size: 60,
         enableSorting: false,
       },
@@ -587,12 +466,7 @@ export function TendersPage() {
         header: 'Дедлайн',
         accessorKey: 'deadline_at',
         cell: ({ row }) => (
-          <span className={cn(
-            'text-sm',
-            row.original.deadline_at && new Date(row.original.deadline_at) < new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
-              ? 'text-red-600 font-medium'
-              : 'text-slate-600'
-          )}>
+          <span className={cn('text-sm', row.original.deadline_at && new Date(row.original.deadline_at) < new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) ? 'text-red-600 font-medium' : 'text-slate-600')}>
             {formatDate(row.original.deadline_at)}
           </span>
         ),
@@ -610,11 +484,7 @@ export function TendersPage() {
         id: 'margin',
         header: 'Маржа',
         accessorKey: 'best_margin_percent',
-        cell: ({ row }) => (
-          <span className="text-sm font-medium text-green-600">
-            {row.original.best_margin_percent ? `${row.original.best_margin_percent.toFixed(1)}%` : '—'}
-          </span>
-        ),
+        cell: ({ row }) => <span className="text-sm font-medium text-green-600">{row.original.best_margin_percent ? `${row.original.best_margin_percent.toFixed(1)}%` : '—'}</span>,
         size: 60,
         enableSorting: false,
       },
@@ -630,48 +500,29 @@ export function TendersPage() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => navigate(`/tenders/${row.original.id}`)}>
-                <FileText className="h-4 w-4 mr-2" aria-hidden="true" />
-                Открыть карточку
+                <FileText className="h-4 w-4 mr-2" aria-hidden="true" />Открыть карточку
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => { setModalState('reprocess'); }}>
-                <Play className="h-4 w-4 mr-2" aria-hidden="true" />
-                Перезапустить обработку
+              <DropdownMenuItem onClick={() => setModalState('reprocess')}>
+                <Play className="h-4 w-4 mr-2" aria-hidden="true" />Перезапустить обработку
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { setModalState('search'); }}>
-                <Users className="h-4 w-4 mr-2" aria-hidden="true" />
-                Найти поставщиков
+              <DropdownMenuItem onClick={() => setModalState('search')}>
+                <Users className="h-4 w-4 mr-2" aria-hidden="true" />Найти поставщиков
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { setModalState('cp'); }}>
-                <Send className="h-4 w-4 mr-2" aria-hidden="true" />
-                Запросить КП
+              <DropdownMenuItem onClick={() => setModalState('cp')}>
+                <Send className="h-4 w-4 mr-2" aria-hidden="true" />Запросить КП
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { setModalState('negotiate'); }}>
-                <MessagesSquare className="h-4 w-4 mr-2" aria-hidden="true" />
-                Переговоры
+              <DropdownMenuItem onClick={() => setModalState('negotiate')}>
+                <MessagesSquare className="h-4 w-4 mr-2" aria-hidden="true" />Переговоры
               </DropdownMenuItem>
               {row.original.status === 'UNCERTAIN' && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => {
-                      tendersApi.patch(row.original.id, { status: 'RELEVANT', note: 'Подтверждено вручную' })
-                        .then(() => { toast.success('Тендер подтверждён'); tendersQuery.refetch(); })
-                        .catch(() => toast.error('Ошибка'));
-                    }}
-                  >
-                    <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" aria-hidden="true" />
-                    Подтвердить
+                  <DropdownMenuItem onClick={() => { tendersApi.patch(row.original.id, { status: 'RELEVANT', note: 'Подтверждено вручную' }).then(() => { toast.success('Тендер подтверждён'); tendersQuery.refetch(); }).catch(() => toast.error('Ошибка')); }}>
+                    <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" aria-hidden="true" />Подтвердить
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      tendersApi.patch(row.original.id, { status: 'NOT_RELEVANT', note: 'Отклонено вручную' })
-                        .then(() => { toast.success('Тендер отклонён'); tendersQuery.refetch(); })
-                        .catch(() => toast.error('Ошибка'));
-                    }}
-                  >
-                    <XCircle className="h-4 w-4 mr-2 text-red-600" aria-hidden="true" />
-                    Отклонить
+                  <DropdownMenuItem onClick={() => { tendersApi.patch(row.original.id, { status: 'NOT_RELEVANT', note: 'Отклонено вручную' }).then(() => { toast.success('Тендер отклонён'); tendersQuery.refetch(); }).catch(() => toast.error('Ошибка')); }}>
+                    <XCircle className="h-4 w-4 mr-2 text-red-600" aria-hidden="true" />Отклонить
                   </DropdownMenuItem>
                 </>
               )}
@@ -679,8 +530,7 @@ export function TendersPage() {
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => navigate('/decisions')}>
-                    <ClipboardCheck className="h-4 w-4 mr-2 text-purple-600" aria-hidden="true" />
-                    К решению
+                    <ClipboardCheck className="h-4 w-4 mr-2 text-purple-600" aria-hidden="true" />К решению
                   </DropdownMenuItem>
                 </>
               )}
@@ -701,106 +551,54 @@ export function TendersPage() {
         description={`Всего: ${meta?.total || 0}`}
         actions={
           <>
-            <button
-              onClick={handleExportCSV}
-              className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-            >
-              <Download className="h-4 w-4" aria-hidden="true" />
-              Экспорт CSV
+            <button onClick={handleExportCSV} className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+              <Download className="h-4 w-4" aria-hidden="true" />Экспорт CSV
             </button>
-            <button
-              onClick={() => tendersQuery.refetch()}
-              className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-            >
-              <RefreshCw className="h-4 w-4" aria-hidden="true" />
-              Обновить
+            <button onClick={() => tendersQuery.refetch()} className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+              <RefreshCw className="h-4 w-4" aria-hidden="true" />Обновить
             </button>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={cn(
-                'inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors',
-                showFilters
-                  ? 'border-blue-200 bg-blue-50 text-blue-700'
-                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-              )}
-            >
-              <Search className="h-4 w-4" aria-hidden="true" />
-              Фильтры
-              {filters.status.length > 0 && (
-                <span className="bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5">
-                  {filters.status.length}
-                </span>
-              )}
+            <button onClick={() => setShowFilters(!showFilters)} className={cn('inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors', showFilters ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50')}>
+              <Search className="h-4 w-4" aria-hidden="true" />Фильтры
+              {filters.status.length > 0 && <span className="bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5">{filters.status.length}</span>}
             </button>
           </>
         }
       />
 
-      {/* Фильтры */}
       {showFilters && (
         <div className="rounded-lg border border-slate-200 p-4 mb-6 bg-white">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <div>
               <Label className="text-xs text-slate-500">Поиск</Label>
               <Input
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Название, описание, заказчик"
-                defaultValue={filters.search}
-                onChange={(e) => {
-                  const timer = setTimeout(() => updateFilters({ search: e.target.value, page: 1 }), 300);
-                  return () => clearTimeout(timer);
-                }}
                 className="mt-1"
               />
             </div>
             <div>
               <Label className="text-xs text-slate-500">Статус</Label>
-              <select
-                multiple
-                value={filters.status}
-                onChange={(e) => {
-                  const values = Array.from(e.target.selectedOptions).map((o) => o.value);
-                  updateFilters({ status: values, page: 1 });
-                }}
-                className="w-full h-20 border border-slate-200 rounded-md px-2 py-1 text-sm mt-1"
-              >
-                {STATUS_OPTIONS.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
+              <select multiple value={filters.status} onChange={(e) => { const values = Array.from(e.target.selectedOptions).map((o) => o.value); updateFilters({ status: values, page: 1 }); }} className="w-full h-20 border border-slate-200 rounded-md px-2 py-1 text-sm mt-1">
+                {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
-              {filters.status.length > 0 && (
-                <button
-                  onClick={() => updateFilters({ status: [], page: 1 })}
-                  className="text-xs text-blue-600 mt-1"
-                >
-                  Очистить ({filters.status.length})
-                </button>
-              )}
+              {filters.status.length > 0 && <button onClick={() => updateFilters({ status: [], page: 1 })} className="text-xs text-blue-600 mt-1">Очистить ({filters.status.length})</button>}
             </div>
             <div>
               <Label className="text-xs text-slate-500">Категория</Label>
-              <select
-                value={filters.category_id || ''}
-                onChange={(e) => updateFilters({ category_id: e.target.value || null, page: 1 })}
-                className="w-full h-9 border border-slate-200 rounded-md px-2 text-sm mt-1"
-              >
+              <select value={filters.category_id || ''} onChange={(e) => updateFilters({ category_id: e.target.value || null, page: 1 })} className="w-full h-9 border border-slate-200 rounded-md px-2 text-sm mt-1">
                 <option value="">Все</option>
-                {(categoriesQuery.data || []).map((cat) => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
+                {(categoriesQuery.data || []).map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
               </select>
+              {categoriesQuery.isError && <p className="text-xs text-red-600 mt-1">Не удалось загрузить категории</p>}
             </div>
             <div>
               <Label className="text-xs text-slate-500">Источник</Label>
-              <select
-                value={filters.source_id || ''}
-                onChange={(e) => updateFilters({ source_id: e.target.value || null, page: 1 })}
-                className="w-full h-9 border border-slate-200 rounded-md px-2 text-sm mt-1"
-              >
+              <select value={filters.source_id || ''} onChange={(e) => updateFilters({ source_id: e.target.value || null, page: 1 })} className="w-full h-9 border border-slate-200 rounded-md px-2 text-sm mt-1">
                 <option value="">Все</option>
-                {(sourcesQuery.data || []).map((src) => (
-                  <option key={src.id} value={src.id}>{src.name}</option>
-                ))}
+                {(sourcesQuery.data || []).map((src) => <option key={src.id} value={src.id}>{src.name}</option>)}
               </select>
+              {sourcesQuery.isError && <p className="text-xs text-red-600 mt-1">Не удалось загрузить источники</p>}
             </div>
             <div>
               <Label className="text-xs text-slate-500">НМЦК от (₽)</Label>
@@ -835,73 +633,41 @@ export function TendersPage() {
               <Input type="number" min={0} max={100} placeholder="100" defaultValue={filters.score_max} onChange={(e) => updateFilters({ score_max: e.target.value, page: 1 })} className="mt-1" />
             </div>
             <div className="flex items-end pb-2">
-              <label className="flex items-center gap-2 text-sm">
-                <Checkbox checked={filters.has_score} onCheckedChange={(checked) => updateFilters({ has_score: !!checked, page: 1 })} />
-                Есть решение
-              </label>
+              <label className="flex items-center gap-2 text-sm"><Checkbox checked={filters.has_score} onCheckedChange={(checked) => updateFilters({ has_score: !!checked, page: 1 })} />Есть решение</label>
             </div>
             <div>
               <Label className="text-xs text-slate-500">Сортировка</Label>
-              <select
-                value={filters.sort_by}
-                onChange={(e) => updateFilters({ sort_by: e.target.value })}
-                className="w-full h-9 border border-slate-200 rounded-md px-2 text-sm mt-1"
-              >
-                {SORT_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
+              <select value={filters.sort_by} onChange={(e) => updateFilters({ sort_by: e.target.value })} className="w-full h-9 border border-slate-200 rounded-md px-2 text-sm mt-1">
+                {SORT_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
               </select>
             </div>
             <div>
               <Label className="text-xs text-slate-500">Порядок</Label>
-              <select
-                value={filters.sort_order}
-                onChange={(e) => updateFilters({ sort_order: e.target.value as 'asc' | 'desc' })}
-                className="w-full h-9 border border-slate-200 rounded-md px-2 text-sm mt-1"
-              >
+              <select value={filters.sort_order} onChange={(e) => updateFilters({ sort_order: e.target.value as 'asc' | 'desc' })} className="w-full h-9 border border-slate-200 rounded-md px-2 text-sm mt-1">
                 <option value="desc">По убыванию</option>
                 <option value="asc">По возрастанию</option>
               </select>
             </div>
           </div>
           <div className="flex justify-end mt-4">
-            <Button variant="outline" onClick={resetFilters}>
-              <X className="h-4 w-4 mr-2" aria-hidden="true" />
-              Сбросить всё
-            </Button>
+            <Button variant="outline" onClick={resetFilters}><X className="h-4 w-4 mr-2" aria-hidden="true" />Сбросить всё</Button>
           </div>
         </div>
       )}
 
-      {/* Bulk-панель */}
       {selectedCount > 0 && (
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 mb-4 flex items-center justify-between">
           <span className="text-sm font-medium text-blue-700">Выбрано: {selectedCount} тендер(ов)</span>
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => setModalState('reprocess')}>
-              <Play className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />
-              Обработать
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setModalState('search')}>
-              <Users className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />
-              Поставщики
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setModalState('cp')}>
-              <Send className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />
-              Запросить КП
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setModalState('negotiate')}>
-              <MessagesSquare className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />
-              Переговоры
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setRowSelection({})}>
-              Очистить
-            </Button>
+            <Button size="sm" variant="outline" onClick={() => setModalState('reprocess')}><Play className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />Обработать</Button>
+            <Button size="sm" variant="outline" onClick={() => setModalState('search')}><Users className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />Поставщики</Button>
+            <Button size="sm" variant="outline" onClick={() => setModalState('cp')}><Send className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />Запросить КП</Button>
+            <Button size="sm" variant="outline" onClick={() => setModalState('negotiate')}><MessagesSquare className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />Переговоры</Button>
+            <Button size="sm" variant="ghost" onClick={() => setRowSelection({})}>Очистить</Button>
           </div>
         </div>
       )}
 
-      {/* Таблица */}
       {tendersQuery.isLoading ? (
         <LoadingSkeleton rows={10} cols={8} type="table" />
       ) : tendersQuery.isError ? (
@@ -910,7 +676,6 @@ export function TendersPage() {
         <DataTable
           data={tenders}
           columns={columns}
-          isLoading={tendersQuery.isLoading}
           page={filters.page}
           pageCount={meta?.pages || 1}
           total={meta?.total}
@@ -923,47 +688,18 @@ export function TendersPage() {
           onRowSelectionChange={setRowSelection}
           showCheckboxes
           onRowClick={(row) => navigate(`/tenders/${row.id}`)}
+          enableVirtualization
+          tableHeight={600}
           emptyState={
-            <EmptyState
-              icon={FileText}
-              title="Тендеры не найдены"
-              description="Попробуйте изменить фильтры или сбросить их"
-              actionLabel="Сбросить фильтры"
-              onAction={resetFilters}
-            />
+            <EmptyState icon={FileText} title="Тендеры не найдены" description="Попробуйте изменить фильтры или сбросить их" actionLabel="Сбросить фильтры" onAction={resetFilters} />
           }
         />
       )}
 
-      {/* Модалки */}
-      <ReprocessModal
-        open={modalState === 'reprocess'}
-        onOpenChange={(open) => !open && setModalState('none')}
-        selectedCount={selectedCount || 1}
-        onConfirm={(fromStage) => handleBulkAction('reprocess', { from_stage: fromStage })}
-        isLoading={isBulkLoading}
-      />
-      <SearchSuppliersModal
-        open={modalState === 'search'}
-        onOpenChange={(open) => !open && setModalState('none')}
-        selectedCount={selectedCount || 1}
-        onConfirm={(data) => handleBulkAction('search', data)}
-        isLoading={isBulkLoading}
-      />
-      <RequestCPModal
-        open={modalState === 'cp'}
-        onOpenChange={(open) => !open && setModalState('none')}
-        selectedCount={selectedCount || 1}
-        onConfirm={(data) => handleBulkAction('cp', data)}
-        isLoading={isBulkLoading}
-      />
-      <NegotiateModal
-        open={modalState === 'negotiate'}
-        onOpenChange={(open) => !open && setModalState('none')}
-        selectedCount={selectedCount || 1}
-        onConfirm={(data) => handleBulkAction('negotiate', data)}
-        isLoading={isBulkLoading}
-      />
+      <ReprocessModal open={modalState === 'reprocess'} onOpenChange={(open) => !open && setModalState('none')} selectedCount={selectedCount || 1} onConfirm={(fromStage) => handleBulkAction('reprocess', { from_stage: fromStage })} isLoading={isBulkLoading} />
+      <SearchSuppliersModal open={modalState === 'search'} onOpenChange={(open) => !open && setModalState('none')} selectedCount={selectedCount || 1} onConfirm={(data) => handleBulkAction('search', data)} isLoading={isBulkLoading} />
+      <RequestCPModal open={modalState === 'cp'} onOpenChange={(open) => !open && setModalState('none')} selectedCount={selectedCount || 1} onConfirm={(data) => handleBulkAction('cp', data)} isLoading={isBulkLoading} />
+      <NegotiateModal open={modalState === 'negotiate'} onOpenChange={(open) => !open && setModalState('none')} selectedCount={selectedCount || 1} onConfirm={(data) => handleBulkAction('negotiate', data)} isLoading={isBulkLoading} />
     </div>
   );
 }
