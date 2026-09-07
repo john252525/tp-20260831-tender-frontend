@@ -202,15 +202,15 @@ export function ScoringPage() {
           <h3 className="text-base font-semibold text-slate-900 mb-4">Пороги объёма (НМЦК)</h3>
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div>
-              <Label>Низкий (<, ₽)</Label>
+              <Label>Низкий (&lt;, ₽)</Label>
               <Input type="number" min={0} value={form.volume_low} onChange={(e) => setForm({ ...form, volume_low: e.target.value })} className="mt-1" />
             </div>
             <div>
-              <Label>Средний (<, ₽)</Label>
+              <Label>Средний (&lt;, ₽)</Label>
               <Input type="number" min={0} value={form.volume_medium} onChange={(e) => setForm({ ...form, volume_medium: e.target.value })} className="mt-1" />
             </div>
             <div>
-              <Label>Высокий (<, ₽)</Label>
+              <Label>Высокий (&lt;, ₽)</Label>
               <Input type="number" min={0} value={form.volume_high} onChange={(e) => setForm({ ...form, volume_high: e.target.value })} className="mt-1" />
             </div>
           </div>

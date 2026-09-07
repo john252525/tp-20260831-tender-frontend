@@ -26,10 +26,13 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('api_token');
   if (token) {
-    config.headers['X-API-Token'] = token;
+    config.headers['X-Api-Token'] = token;
   }
   if (['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase() ?? '')) {
-    config.headers['Idempotency-Key'] = crypto.randomUUID();
+    config.headers['Idempotency-Key'] =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
   }
   return config;
 });

@@ -1,9 +1,10 @@
 FROM node:20-alpine as build
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 COPY . .
-RUN npm run build
+ENV VITE_API_BASE_URL=/api/v1
+RUN ./node_modules/.bin/vite build
 
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html

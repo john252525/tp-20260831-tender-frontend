@@ -124,7 +124,12 @@ export function DataTable<TData>({
       <div className={cn('rounded-lg border border-slate-200 overflow-hidden bg-white', className)}>
         {toolbar && <div className="border-b border-slate-200 bg-slate-50 p-3">{toolbar}</div>}
         <div ref={parentRef} className="overflow-auto" style={{ height: `${tableHeight}px` }}>
-          <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
+          <table className="w-full text-sm" style={{ tableLayout: 'fixed', minWidth: `${table.getAllColumns().reduce((sum, c) => sum + c.getSize(), 0)}px` }}>
+            <colgroup>
+              {table.getAllColumns().map((col) => (
+                <col key={col.id} style={{ width: col.getSize(), minWidth: col.getSize() }} />
+              ))}
+            </colgroup>
             {renderThead(true)}
             <tbody style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}>
               {virtualizer.getVirtualItems().map((virtualRow) => {
@@ -158,7 +163,12 @@ export function DataTable<TData>({
     <div className={cn('rounded-lg border border-slate-200 overflow-hidden bg-white', className)}>
       {toolbar && <div className="border-b border-slate-200 bg-slate-50 p-3">{toolbar}</div>}
       <div className="overflow-x-auto">
-        <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
+        <table className="w-full text-sm" style={{ tableLayout: 'fixed', minWidth: `${table.getAllColumns().reduce((sum, c) => sum + c.getSize(), 0)}px` }}>
+          <colgroup>
+            {table.getAllColumns().map((col) => (
+              <col key={col.id} style={{ width: col.getSize(), minWidth: col.getSize() }} />
+            ))}
+          </colgroup>
           {renderThead(false)}
           <tbody>
             {rows.map((row) => (

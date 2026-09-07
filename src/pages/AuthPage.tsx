@@ -23,7 +23,7 @@ export function AuthPage() {
 
     try {
       await apiClient.get('/health', {
-        headers: { 'X-API-Token': trimmedToken },
+        headers: { 'X-Api-Token': trimmedToken },
       });
       localStorage.setItem('api_token', trimmedToken);
       toast.success('Добро пожаловать!');
